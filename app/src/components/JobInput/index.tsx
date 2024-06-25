@@ -14,8 +14,8 @@ export const JobInput = () => {
 
   return (
     <>
-      <TextField label="Client ID" value={clientID} onChange={e => setClientID(e.target.value)} />
-      <TextField label="Axcess Version #" value={versionID} onChange={e => setVersionID(e.target.value)} />
+      <TextField label="Client ID" value={clientID} onChange={e => setClientID(e.target.value)} sx={{ backgroundColor: '#e0e0e0' }} InputLabelProps={{ sx: {color: "#373737"} }} />
+      <TextField label="Axcess Version #" value={versionID} onChange={e => setVersionID(e.target.value)} sx={{ backgroundColor: '#e0e0e0' }} InputLabelProps={{ sx: {color: "#373737"} }} />
     </>
   );
 }

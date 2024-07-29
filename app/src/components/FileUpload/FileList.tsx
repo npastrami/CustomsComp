@@ -1,7 +1,7 @@
 /** @jsxImportSource @emotion/react */
 
 import { FC, useContext } from "react";
-import { Grid, IconButton, Typography, Select, MenuItem } from "@mui/material";
+import { Grid, IconButton, Button, Typography, Select, MenuItem } from "@mui/material";
 import { useState, useEffect } from "react";
 import { FileWithID } from "./FileSort";
 import { TrashCanIcon } from "./TrashCanIcon";
@@ -17,6 +17,15 @@ interface FileListProps {
 export const FileList: FC<FileListProps> = ({ files, onRemove }) => {
   const [localFiles, setLocalFiles] = useState<FileWithID[]>(files);
 
+  // State to track if all files are extracted
+  const [allExtracted, setAllExtracted] = useState(false);
+
+  useEffect(() => {
+    // Check if all files have status 'Extract Completed'
+    const allFilesExtracted = localFiles.every(file => file.status === 'Extract Completed');
+    setAllExtracted(allFilesExtracted);
+  }, [localFiles]);
+
   // Sync localFiles with files prop
   useEffect(() => {
     console.log("Files from props:", files);
@@ -31,8 +40,7 @@ export const FileList: FC<FileListProps> = ({ files, onRemove }) => {
   if (files.length === 0) return null;
 
   // as const is used to make TypeScript treat formTypes as a readonly tuple, not a regular array.
-  const formTypes = ["None", "W2", "MIS1098", "E1098", "T1098", "MISC1099", "NEC1099", "DIV1099", "INT1099", "SA1099", "Q1099", 'A1099',
-  "B1099", "C1099", "CAP1099", "G1099", "H1099", "K1099", "LS1099", "LTC1099", "OID1099", "PATR1099", "QA1099", "R1099", "S1099", "SB1099", "K1-1065"] as const;
+  const formTypes = ["None", "W2", "Customs"] as const;
 
   // typeof formTypes[number] then creates a union type of the values in formTypes, which is equivalent to the original FormType type.
   // This allows us to use the formTypes array to define the type of a variable, but also use the type of the values in the array elsewhere.
@@ -60,6 +68,23 @@ export const FileList: FC<FileListProps> = ({ files, onRemove }) => {
     const a = document.createElement('a');
     a.href = url;
     a.download = `${documentName}.csv`;
+    a.click();
+  };
+
+  const handleDownloadAll = async (clientID: string) => {
+    const documentNames = localFiles.map(file => file.path);
+    const response = await fetch('/api/download_all_documents', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ clientID, documentNames }) // Pass the array of document names
+    });
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${clientID}_FOF_Data.xlsx`; // Change file extension to xlsx
     a.click();
   };
 
@@ -174,8 +199,22 @@ export const FileList: FC<FileListProps> = ({ files, onRemove }) => {
           ))}
         </div>
       </div>
+      <div css={{ display: 'flex', flexDirection: 'row', marginLeft: 'auto', marginTop: '20px' }}>
+        {/* Download All Button */}
+        <Button
+          variant="contained"
+          onClick={(_e) => handleDownloadAll(clientID)}
+          disabled={!allExtracted} // Disable button if not all files are extracted
+          style={{ marginRight: '10px',
+          height: '36px', 
+          minWidth: '200px', marginTop: '20px' }}
+        >
+          Download All
+        </Button>
 
-      <ExtractButton files={localFiles} setFiles={setLocalFiles} />
+        {/* Existing Extract Button */}
+        <ExtractButton files={localFiles} setFiles={setLocalFiles} />
+      </div>
     </div>
   );
 };

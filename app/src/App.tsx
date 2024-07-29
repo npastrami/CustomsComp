@@ -85,7 +85,7 @@ function App() {
               marginBottom: '20px', // Add some space below the title
             }}
           >
-            Customs Computer
+            Enrique's Customs
           </Typography>
           
           <JobInput />

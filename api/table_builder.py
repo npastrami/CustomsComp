@@ -6,7 +6,7 @@ class TableBuilder:
         self.conn = await asyncpg.connect(
             database="postgres",
             user="postgres",
-            password="kr3310",
+            password="newpassword",
             host="localhost",
             port="5432"
         )

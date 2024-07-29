@@ -1,15 +1,22 @@
-from quart import Quart, request, jsonify, Response
+from quart import Quart, request, jsonify, Response, send_file
 from quart_cors import cors
 from werkzeug.utils import secure_filename
 from uploader import Uploader
-from extractor import Extractor 
+from extractor import Extractor
+from azure.storage.blob.aio import BlobServiceClient
+import azure_credentials 
+import aiofiles
+from io import BytesIO
+from copyfunc import copy_worksheet
 from database import Database
+from FOFexport import process_FOF
 from sorter import Sorter
 from form_mapping_utils import upload_bucket_mapping
 from table_builder import TableBuilder
 import xml.etree.ElementTree as ET
 import re
 import asyncio
+import openpyxl
 import io
 
 app = Quart(__name__)
@@ -129,6 +136,63 @@ async def sort():
     
     print(f'sorted_files: {sorted_files}')
     return {'sorted_files': sorted_files}
+
+@app.route('/download_all_documents', methods=['POST', 'GET'])
+async def download_all_documents():
+        data = await request.json
+        client_id = data['clientID']
+        document_names = data['documentNames']
+
+        # Initialize the BlobServiceClient asynchronously
+        blob_service_client = BlobServiceClient.from_connection_string(azure_credentials.CONNECTION_STRING)
+        container_client = blob_service_client.get_container_client(azure_credentials.BUCKET_NAME_CUSTOMS)
+
+        # Download the existing FOFtest.xlsx
+        blob_client = container_client.get_blob_client('FOFtemplate.xlsx')
+        fof_test_stream = BytesIO()
+        stream_downloader = await blob_client.download_blob()
+        await stream_downloader.readinto(fof_test_stream)
+        fof_test_stream.seek(0)
+        fof_workbook = openpyxl.load_workbook(fof_test_stream)
+
+        db = Database(None, None)
+
+        # Create a new workbook
+        workbook = openpyxl.Workbook()
+        workbook.remove(workbook.active)  # Remove the default sheet
+
+        copy_worksheet(fof_workbook, workbook, 'Sheet1') 
+
+        for document_name in document_names:
+            sanitized_name = sanitize_blob_name(document_name)
+            original_data, fof_data = await db.generate_sheet_data(sanitized_name, client_id)  
+            
+            # Add original sheet
+            original_sheet = workbook.create_sheet(title=sanitized_name)
+            for row in original_data:
+                original_sheet.append(row)
+            
+            # Add FOF sheet
+            fof_sheet = workbook.create_sheet(title=f"FOF_{sanitized_name}")
+            for row in fof_data:
+                fof_sheet.append(row)
+
+        fof_sheet_objects = [workbook[sheet_name] for sheet_name in workbook.sheetnames if 'FOF_' in sheet_name]
+        
+        process_FOF(workbook, fof_sheet_objects) 
+
+        # Save the workbook to a BytesIO object
+        output_stream = BytesIO()
+        workbook.save(output_stream)
+        output_stream.seek(0)
+
+        # Save the workbook to a temporary file
+        async with aiofiles.tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            await tmp.write(output_stream.getvalue())
+            await tmp.flush()
+            response = await send_file(tmp.name, as_attachment=True, attachment_filename=f"{client_id}_Customs_Batch_Data.xlsx")
+        return response
+
 
 
 if __name__ == "__main__":

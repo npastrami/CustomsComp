@@ -1,11 +1,29 @@
 import openpyxl
 from openpyxl.utils import get_column_letter
-from openpyxl.styles import Alignment, PatternFill
+from openpyxl.styles import Alignment, PatternFill, Border, Side
 import numpy as np
 import pandas as pd
 import re
 from io import BytesIO
 from itemcodeoffsets import keyword_to_offset_dict
+
+def get_color_for_value(value):
+    color_ranges = [
+        (0.0, 0.1, 'FFFF0000'),  # Red
+        (0.1, 0.2, 'FFFF4C4C'),
+        (0.2, 0.3, 'FFFF9999'),
+        (0.3, 0.4, 'FFFFCC99'),
+        (0.4, 0.5, 'FFFFFF99'),
+        (0.5, 0.6, 'FFCCFF99'),
+        (0.6, 0.7, 'FF99FF99'),
+        (0.7, 0.8, 'FF66FF99'),
+        (0.8, 0.9, 'FF33FF99'),
+        (0.9, 1.0, 'FF00FF00'),  # Green
+    ]
+    for min_val, max_val, color in color_ranges:
+        if min_val <= value <= max_val:
+            return color
+    return 'FFFFFF'  # Default to white if no match
 
 def process_FOF(workbook, fof_sheets):   
         mappings = {
@@ -88,7 +106,20 @@ def process_FOF(workbook, fof_sheets):
         }
         
         target_worksheet = workbook["Sheet1"]
-        starting_row = 5
+        
+        # Set the header row
+        target_worksheet["A1"] = "Document Name"
+        for key, value in mappings.items():
+            col_letter = get_column_letter(value + 1)  # Adjust index to match the correct column in Excel
+            target_worksheet[f"{col_letter}1"] = key
+        
+        # Add bottom border to row 1
+        border = Border(bottom=Side(style='thin'))
+        for col in range(1, target_worksheet.max_column + 1):
+            cell = target_worksheet.cell(row=1, column=col)
+            cell.border = border
+        
+        starting_row = 3
 
         for sheet_index, fof_sheet in enumerate(fof_sheets, start=starting_row):
             # Extracting the sheet name and removing the 'FOF_' prefix
@@ -134,7 +165,13 @@ def process_FOF(workbook, fof_sheets):
                                 items_with_target_col.append(item + [target_col])  # Create a new list with target_col
 
                         amount_cell = row[2].value
-                        target_worksheet.cell(row=row_number, column=target_col, value=amount_cell)
+                        confidence_value = row[3].value if len(row) > 3 else None  # Extract confidence value
+                        target_cell = target_worksheet.cell(row=row_number, column=target_col, value=amount_cell)
+
+                        # Apply color fill based on confidence value
+                        if confidence_value is not None and isinstance(confidence_value, float):
+                            color = get_color_for_value(confidence_value)
+                            target_cell.fill = PatternFill(start_color=color, end_color=color, fill_type='solid')
             print(f'All items with footnotes: {items_with_footnotes}')
             
             for keyword_for_comparison, item_code, sheet_index, target_col in items_with_target_col:
@@ -145,13 +182,22 @@ def process_FOF(workbook, fof_sheets):
                 cell_to_highlight.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
                         
         for row in range(1, target_worksheet.max_row + 1):
-            # row_letter = get_column_letter(row)
             target_worksheet.row_dimensions[row].height = 25  # Approximate conversion
+            
+        # Find the last row with data
+        last_data_row = target_worksheet.max_row
+
+        # Make Totals Column for Rows 5-300 in Column A, adding a buffer row
+        totals_row = last_data_row + 2
+        border_top = Border(top=Side(style='thin'))
+        
+        # # Set the totals label in the A column
+        # target_worksheet[f"A{totals_row}"] = "Totals"
                 
         # Make Totals Column for Rows 5-300 in Column A
-        for col_num in range(5, 300):  # End range is exclusive, so 300 to include column 299
+        for col_num in range(1, 300):  # End range is exclusive, so 300 to include column 299
             sum_value = 0  # Initialize sum for the current column
-            for row_num in range(1, target_worksheet.max_row + 1):  # Start from row 1
+            for row_num in range(1, last_data_row + 1):  # Start from row 1
                 cell = target_worksheet.cell(row=row_num, column=col_num)
                 cell_value = cell.value
                 # Check if the cell contains a string with parentheses or a negative sign
@@ -168,14 +214,34 @@ def process_FOF(workbook, fof_sheets):
 
             # Update Row 1 with the calculated sum for the current column, converting sum to string, make 0 totals blank
             if sum_value != 0:
-                target_worksheet.cell(row=1, column=col_num, value=str(sum_value))  # Row 1 is the 1st row
+                target_worksheet.cell(row=totals_row, column=col_num, value=str(sum_value))  # Row 1 is the 1st row
             else:
-                target_worksheet.cell(row=1, column=col_num, value="")
+                target_worksheet.cell(row=totals_row, column=col_num, value="")
+        
+            # Apply top border to the totals row
+            cell = target_worksheet.cell(row=totals_row, column=col_num)
+            cell.border = border_top
+                
+        # Adjust column width to fit text
+        for col in target_worksheet.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(cell.value)
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            target_worksheet.column_dimensions[column].width = adjusted_width        
 
         # Set text wrap for column A
         for row in range(1, target_worksheet.max_row + 1):
             cell = target_worksheet.cell(row=row, column=1)
             cell.alignment = Alignment(wrap_text=True, horizontal='center', vertical='center')
+            
+        # Set the totals label in the A column
+        target_worksheet[f"A{totals_row}"] = "Totals"
 
         # Rename the worksheet
         target_worksheet.title = "FOF_Data"

@@ -1,14 +1,14 @@
 from azure.ai.documentintelligence.models import AnalyzeResult
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.documentintelligence.aio import DocumentIntelligenceClient
-import azure_credentials
+import api.credentials as credentials
 from form_mapping_utils import sorter_form_mapping
 import io
 
 class Sorter:
     def __init__(self):
-        self.endpoint = azure_credentials.FORM_RECOGNIZER_ENDPOINT_PREBUILT
-        self.key = azure_credentials.FORM_RECOGNIZER_KEY_PREBUILT
+        self.endpoint = credentials.FORM_RECOGNIZER_ENDPOINT_PREBUILT
+        self.key = credentials.FORM_RECOGNIZER_KEY_PREBUILT
 
     async def sort(self, file_stream):
         file_bytes = io.BytesIO(file_stream.read())

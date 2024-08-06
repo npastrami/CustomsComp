@@ -82,6 +82,16 @@ class Database:
         
         return last_inserted_id
     
+    async def get_field_values(self, client_id, doc_type):
+        await self.ensure_connected()
+        query = """
+        SELECT field_name, field_value
+        FROM extracted_fields
+        WHERE client_id = $1 AND doc_type = $2;
+        """
+        rows = await self.conn.fetch(query, client_id, doc_type)
+        return rows
+    
     async def generate_csv(self, document_id, client_id):
         await self.ensure_connected()
         # Query to fetch all fields and values for a specific document and client

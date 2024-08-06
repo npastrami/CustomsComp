@@ -16,3 +16,8 @@ extractor_model_mapping = {
     'Customs': 'enriqueCustoms',
     'None': 'unsorted',
 }
+
+netchb_term_matching = {
+    'Field1': 'MappedField1',
+    'Field2': 'MappedField2',
+}

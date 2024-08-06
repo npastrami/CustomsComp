@@ -1,10 +1,10 @@
 from azure.storage.blob.aio import BlobServiceClient
-import azure_credentials
+import api.credentials as credentials
 from werkzeug.utils import secure_filename
 
 class Uploader:
     def __init__(self, container_name):
-        self.connection_string = azure_credentials.CONNECTION_STRING
+        self.connection_string = credentials.CONNECTION_STRING
         self.container_name = container_name
 
     async def upload(self, client_id, file):

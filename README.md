@@ -18,6 +18,7 @@ pipenv shell
 python main.py
 ```
 
+--- Warning: pipenv outdated, you may need to install some additional packages.
 
 ## To run the App:
 
